@@ -1,58 +1,78 @@
 package main
 
 import (
+	"errors"
 	"fmt"
-	"log"
+	"io"
 	"net"
-	"sync"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"github.com/ductran999/go-socket-poc/gnetcat/client"
+	"github.com/ductran999/go-socket-poc/gnetcat/server"
+	"github.com/ductran999/go-socket-poc/logger"
 )
 
 func main() {
-	// create listener
-	srv, err := net.Listen("tcp", "localhost:8080")
+	fmt.Println("Welcome to Go Net Cat")
+	fmt.Println("1. Start Server")
+	fmt.Println("2. Start Client")
+	fmt.Print("=> Enter Your option:")
+
+	var option int
+	_, err := fmt.Scanln(&option)
 	if err != nil {
-		log.Fatal("listen error:", err)
+		logger.Fatal("invalid input:", err.Error())
 	}
-	defer srv.Close()
 
-	// start client connection
-	client, err := net.Dial("tcp", "localhost:8080")
-	if err != nil {
-		log.Fatal("dial error:", err)
-	}
-	defer client.Close()
-
-	var wg sync.WaitGroup
-
-	// server goroutine
-	wg.Go(func() {
-		conn, err := srv.Accept()
-		if err != nil {
-			log.Println("accept error:", err)
-			return
+	switch option {
+	case 1:
+		srv := server.NewServer()
+		if err := srv.Open(); err != nil {
+			logger.Fatal("failed to open server", err.Error())
 		}
-		defer conn.Close()
+		logger.Info("server listening on port 8080")
 
-		n, err := conn.Write([]byte("duc"))
-		if err != nil {
-			fmt.Println("write error:", err)
-		}
-		fmt.Println("server wrote bytes:", n)
-	})
-
-	// client goroutine
-	wg.Go(func() {
-		buf := make([]byte, 1024)
-		defer client.Close()
-		for {
-			n, err := client.Read(buf)
-			if err != nil {
-				log.Println("client read error:", err)
-				return
+		go func() {
+			if err := srv.Serve(); err != nil && !errors.Is(err, net.ErrClosed) {
+				logger.Error("server got error:", err.Error())
 			}
-			fmt.Println("client received:", string(buf[:n]))
-		}
-	})
+		}()
 
-	wg.Wait()
+		gracefulShutdown(srv.Close)
+	case 2:
+		c := client.NewClient()
+		if err := c.Dial(); err != nil {
+			logger.Fatal("failed to dial to host", err.Error())
+		}
+		logger.Info("server accept your call")
+
+		go func() {
+			if err := c.Send(); err != nil &&
+				!errors.Is(err, net.ErrClosed) &&
+				!errors.Is(err, io.EOF) {
+				logger.Error(err.Error())
+			}
+		}()
+
+		gracefulShutdown(c.Close)
+	default:
+		logger.Error("Invalid option. Please enter 1 or 2.")
+	}
+}
+
+func gracefulShutdown(close func() error) {
+	// wait for Ctrl+C
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	<-c
+	logger.Info("Shutting down...")
+
+	err := close()
+	if err != nil {
+		logger.Error("failed to shut down:", err.Error())
+	} else {
+		logger.Info("shutdown cleanly")
+	}
 }
