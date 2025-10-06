@@ -10,13 +10,13 @@ import (
 )
 
 type GNetCatServer interface {
-	// Server register port to listen on
+	// Open registers and starts listening on the configured port.
 	Open() error
 
-	// Accept connect from client
+	// Serve accepts and handles incoming client connections.
 	Serve() error
 
-	// Stop listening
+	// Close stops listening and releases all associated resources.
 	Close() error
 }
 

@@ -9,8 +9,13 @@ import (
 )
 
 type GNetCatClient interface {
+	// Dial establishes a connection to the configured remote address.
 	Dial() error
+
+	// Send transmits data over the active connection.
 	Send() error
+
+	// Close gracefully terminates the connection and releases any resources.
 	Close() error
 }
 
