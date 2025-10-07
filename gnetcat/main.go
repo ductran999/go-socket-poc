@@ -28,38 +28,46 @@ func main() {
 
 	switch option {
 	case 1:
-		srv := server.NewServer()
-		if err := srv.Open(); err != nil {
-			logger.Fatal("failed to open server", err.Error())
-		}
-		logger.Info("server listening on port 8080")
-
-		go func() {
-			if err := srv.Serve(); err != nil && !errors.Is(err, net.ErrClosed) {
-				logger.Error("server got error:", err.Error())
-			}
-		}()
-
-		gracefulShutdown(srv.Close)
+		startServer()
 	case 2:
-		c := client.NewClient()
-		if err := c.Dial(); err != nil {
-			logger.Fatal("failed to dial to host", err.Error())
-		}
-		logger.Info("server accept your call")
-
-		go func() {
-			if err := c.Send(); err != nil &&
-				!errors.Is(err, net.ErrClosed) &&
-				!errors.Is(err, io.EOF) {
-				logger.Error(err.Error())
-			}
-		}()
-
-		gracefulShutdown(c.Close)
+		startClient()
 	default:
 		logger.Error("Invalid option. Please enter 1 or 2.")
 	}
+}
+
+func startServer() {
+	srv := server.NewServer()
+	if err := srv.Open(); err != nil {
+		logger.Fatal("failed to open server", err.Error())
+	}
+	logger.Info("server listening on port 8080")
+
+	go func() {
+		if err := srv.Serve(); err != nil && !errors.Is(err, net.ErrClosed) {
+			logger.Error("server got error:", err.Error())
+		}
+	}()
+
+	gracefulShutdown(srv.Close)
+}
+
+func startClient() {
+	c := client.NewClient()
+	if err := c.Dial(); err != nil {
+		logger.Fatal("failed to dial to host", err.Error())
+	}
+	logger.Info("server accept your call")
+
+	go func() {
+		if err := c.Send(); err != nil &&
+			!errors.Is(err, net.ErrClosed) &&
+			!errors.Is(err, io.EOF) {
+			logger.Error(err.Error())
+		}
+	}()
+
+	gracefulShutdown(c.Close)
 }
 
 func gracefulShutdown(close func() error) {
