@@ -10,13 +10,13 @@ import (
 )
 
 type GNetCatServer interface {
-	// Server register port to listen on
+	// Open registers and starts listening on the configured port.
 	Open() error
 
-	// Accept connect from client
+	// Serve accepts and handles incoming client connections.
 	Serve() error
 
-	// Stop listening
+	// Close stops listening and releases all associated resources.
 	Close() error
 }
 
@@ -42,7 +42,12 @@ func (s *server) Serve() error {
 
 		// Handle client in separate goroutine
 		go func(c net.Conn) {
-			defer c.Close()
+			defer func() {
+				if err := c.Close(); err != nil {
+					logger.Warn("failed to close client connection", err.Error())
+				}
+			}()
+
 			buf := make([]byte, 4096)
 
 			for {
@@ -59,6 +64,7 @@ func (s *server) Serve() error {
 
 				msg := string(buf[:n])
 				ans := fmt.Sprintf("Hello '%s'", msg)
+
 				_, err = c.Write([]byte(ans))
 				if err != nil {
 					logger.Error("write error:", err.Error())
